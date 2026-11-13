@@ -27,19 +27,19 @@ Dibangun dan dikelola oleh **@admj1btnl (Jibsz)**.
 ## 🚀 Cara Upload ke GitHub & Instalasi 1 Baris di VPS NAT
 
 ### Opsi A: Clone & Install Langsung dari GitHub Anda
-Setelah seluruh isi folder ini di-upload ke repositori GitHub Anda (contoh: `https://github.com/USERNAME_ANDA/jibsz-stunnel`):
+Setelah seluruh isi folder ini di-upload ke repositori GitHub Anda (contoh: `https://github.com/mohamadrojib278/jibsz-stunnel`):
 
 ```bash
 apt update && apt install -y git curl wget && \
-git clone https://github.com/USERNAME_ANDA/jibsz-stunnel.git /root/jibsz-stunnel && \
+git clone https://github.com/mohamadrojib278/jibsz-stunnel.git /root/jibsz-stunnel && \
 chmod +x /root/jibsz-stunnel/setup.sh && \
 /root/jibsz-stunnel/setup.sh
 ```
 
 ### Opsi B: One-Liner Installer via Raw GitHub
 ```bash
-REPO="https://raw.githubusercontent.com/USERNAME_ANDA/jibsz-stunnel/main/" \
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/USERNAME_ANDA/jibsz-stunnel/main/setup.sh)"
+REPO="https://raw.githubusercontent.com/mohamadrojib278/jibsz-stunnel/main/" \
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/mohamadrojib278/jibsz-stunnel/main/setup.sh)"
 ```
 
 ## 🖥️ Perintah Menu Setelah Instalasi
