@@ -1,0 +1,167 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+clear
+
+mkdir -p /etc/jibsz-stunnel /etc/xray
+CF_TOKEN_FILE="/etc/jibsz-stunnel/cf_token"
+BOT_ENV="/etc/jibsz-stunnel/bot.env"
+domain=$(cat /etc/xray/domain 2>/dev/null || echo "-")
+
+is_active() { systemctl is-active --quiet "$1" 2>/dev/null; }
+if is_active jibsz-cloudflared || is_active cloudflared; then
+    st_cf="${G}ON (ACTIVE)${NC}"
+else
+    st_cf="${R}OFF (INACTIVE)${NC}"
+fi
+
+if is_active jibsz-bot; then
+    st_bot="${G}ON (ACTIVE)${NC}"
+else
+    st_bot="${R}OFF (INACTIVE)${NC}"
+fi
+
+echo -e "${C}╭════════════════════════════════════════════════════════════╮${NC}"
+echo -e "${C}│\e[1;97;104m        JIBSZ STUNNEL - CLOUDFLARE TUNNEL & BOT PANEL       \e[0m${C}│${NC}"
+echo -e "${C}╰════════════════════════════════════════════════════════════╯${NC}"
+echo -e "${C}╭════════════════════════════════════════════════════════════╮${NC}"
+echo -e "${C}│${NC}  Domain Tunnel    : ${Y}${domain}${NC}"
+echo -e "${C}│${NC}  Target Lokal CF  : ${G}http://127.0.0.1:8088${NC} (Multi-Path Nginx/Xray)"
+echo -e "${C}│${NC}  Path WebSocket   : ${C}/vless | /vmess | /trojan-ws | /ss-ws | /ssh-ws${NC}"
+echo -e "${C}│${NC}  Cloudflared Svc  : ${st_cf}"
+echo -e "${C}│${NC}  Telegram Bot Svc : ${st_bot}"
+echo -e "${C}╰════════════════════════════════════════════════════════════╯${NC}"
+echo -e "${C}╭════════════════════════════════════════════════════════════╮${NC}"
+echo -e "${C}│${NC}  [${G}01${NC}] Pasang / Ganti Token Cloudflare Tunnel (Argo)"
+echo -e "${C}│${NC}  [${G}02${NC}] Ganti Domain / Hostname Tunnel"
+echo -e "${C}│${NC}  [${G}03${NC}] Restart Service Cloudflare Tunnel"
+echo -e "${C}│${NC}  [${G}04${NC}] Cek Log Status Cloudflare Tunnel"
+echo -e "${C}│${NC}  [${G}05${NC}] Setup / Ganti BOT_TOKEN & ADMIN_ID Bot Telegram"
+echo -e "${C}│${NC}  [${G}06${NC}] Restart Bot Telegram Control Panel"
+echo -e "${C}│${NC}  [${G}00${NC}] Kembali ke Menu Utama"
+echo -e "${C}╰════════════════════════════════════════════════════════════╯${NC}"
+echo ""
+read -rp "  Pilih Menu [ 0 - 6 ] ❱❱❱ " cfopt
+echo ""
+case "$cfopt" in
+    1|01)
+        echo -e "${Y}Masukkan Cloudflare Tunnel Token Anda (dari Zero Trust -> Tunnels):${NC}"
+        echo -e "${C}(Anda boleh paste token saja eyJh... atau perintah lengkap cloudflared service install eyJh...)${NC}"
+        read -rp "  Token CF : " raw_tok
+        CF_TOK=$(echo "$raw_tok" | grep -oE "eyJ[A-Za-z0-9_-]+" | head -n1)
+        if [[ -z "$CF_TOK" ]]; then
+            CF_TOK=$(echo "$raw_tok" | tr -d "[:space:]")
+        fi
+        if [[ -z "$CF_TOK" ]]; then
+            echo -e "${R}Token tidak boleh kosong!${NC}"
+            sleep 2
+            m-cf
+            exit 0
+        fi
+        echo "$CF_TOK" > "$CF_TOKEN_FILE"
+        chmod 600 "$CF_TOKEN_FILE"
+        cat > /etc/systemd/system/jibsz-cloudflared.service <<ENDCF
+[Unit]
+Description=Jibsz Stunnel Cloudflare Argo Tunnel Daemon
+After=network-online.target nginx.service xray.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate run --token ${CF_TOK}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+ENDCF
+        systemctl daemon-reload
+        systemctl enable --now jibsz-cloudflared >/dev/null 2>&1 || true
+        systemctl restart jibsz-cloudflared >/dev/null 2>&1 || true
+        echo -e "${G}Token Cloudflare Tunnel berhasil dipasang & diaktifkan!${NC}"
+        echo -e "${Y}Pastikan di Dashboard Cloudflare Zero Trust -> Public Hostname:${NC}"
+        echo -e "  Domain : ${domain}"
+        echo -e "  Type   : HTTP"
+        echo -e "  URL    : 127.0.0.1:8088"
+        read -n 1 -s -r -p "Tekan sembarang tombol untuk kembali..."
+        m-cf
+        ;;
+    2|02)
+        read -rp "  Masukkan Domain / Hostname Tunnel Baru : " new_dom
+        new_dom=$(echo "$new_dom" | tr -d "[:space:]")
+        if [[ -n "$new_dom" ]]; then
+            echo "$new_dom" > /etc/xray/domain
+            echo "$new_dom" > /root/domain
+            echo "IP=$new_dom" > /var/lib/kyt/ipvps.conf
+            sed -i "s/server_name .*/server_name ${new_dom} _;/" /etc/nginx/conf.d/xray.conf 2>/dev/null || true
+            systemctl restart nginx xray haproxy >/dev/null 2>&1 || true
+            echo -e "${G}Domain berhasil diperbarui menjadi: ${new_dom}${NC}"
+        fi
+        sleep 2
+        m-cf
+        ;;
+    3|03)
+        systemctl restart jibsz-cloudflared nginx xray ws >/dev/null 2>&1 || true
+        echo -e "${G}Service Cloudflare Tunnel, Nginx, Xray & WS berhasil direstart.${NC}"
+        sleep 2
+        m-cf
+        ;;
+    4|04)
+        clear
+        echo -e "${C}=== LOG STATUS JIBSZ CLOUDFLARED ===${NC}"
+        journalctl -u jibsz-cloudflared -n 25 --no-pager || true
+        echo ""
+        read -n 1 -s -r -p "Tekan sembarang tombol untuk kembali..."
+        m-cf
+        ;;
+    5|05)
+        read -rp "  Masukkan BOT_TOKEN (@BotFather) : " btok
+        read -rp "  Masukkan ADMIN_ID Numerik       : " aid
+        btok=$(echo "$btok" | tr -d "[:space:]")
+        aid=$(echo "$aid" | tr -d "[:space:]")
+        if [[ -n "$btok" && "$aid" =~ ^[0-9]+$ ]]; then
+            cat > "$BOT_ENV" <<ENDBOT
+BOT_TOKEN="${btok}"
+ADMIN_ID="${aid}"
+AUTHORIZED_IDS="${aid}"
+ALLOW_USER_CREATE="true"
+TUNNEL_MODE="named_token"
+TUNNEL_HOST="$(cat /etc/xray/domain 2>/dev/null || echo localhost)"
+PATH_VLESS="/vless"
+PATH_VMESS="/vmess"
+PATH_TROJAN="/trojan-ws"
+PATH_SSH="/ssh-ws"
+XRAY_CONFIG_PATH="/etc/xray/config.json"
+USERS_DB_PATH="/etc/jibsz-stunnel/users_db.json"
+ENDBOT
+            chmod 600 "$BOT_ENV"
+            chown jibszbot:jibszbot "$BOT_ENV" 2>/dev/null || true
+            systemctl enable --now jibsz-bot >/dev/null 2>&1 || true
+            systemctl restart jibsz-bot >/dev/null 2>&1 || true
+            echo -e "${G}Bot Telegram Jibsz Stunnel berhasil dikonfigurasi dan dijalankan!${NC}"
+        else
+            echo -e "${R}Input tidak valid! Pastikan ADMIN_ID berupa angka.${NC}"
+        fi
+        sleep 2
+        m-cf
+        ;;
+    6|06)
+        systemctl restart jibsz-bot >/dev/null 2>&1 || true
+        echo -e "${G}Service Bot Telegram (jibsz-bot) berhasil direstart.${NC}"
+        sleep 2
+        m-cf
+        ;;
+    0|00)
+        menu
+        ;;
+    *)
+        m-cf
+        ;;
+esac

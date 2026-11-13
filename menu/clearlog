@@ -1,0 +1,35 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+data=(`find /var/log/ -name *.log`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+data=(`find /var/log/ -name *.err`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+data=(`find /var/log/ -name mail.*`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+echo > /var/log/syslog
+echo > /var/log/btmp
+echo > /var/log/messages
+echo > /var/log/debug
+echo -e ""
+notif_clearlog
+echo -e " ${G} Clear Log Berhasil ${NC}"
+echo ""

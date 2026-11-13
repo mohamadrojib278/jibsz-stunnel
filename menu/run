@@ -1,0 +1,118 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+DF='\e[39m'
+Bold='\e[1m'
+Blink='\e[5m'
+LRED='\e[91m'
+Blue="\033[36m"
+yellow="\033[33m"
+clear
+
+on="${G}[ON]${NC}${G} │${NC}"
+off="${R}[OFF]${NC} "
+
+is_active() { systemctl is-active --quiet "$1" 2>/dev/null; }
+is_enabled_or_active() { systemctl is-active --quiet "$1" 2>/dev/null || systemctl is-enabled --quiet "$1" 2>/dev/null; }
+status_unit() { if is_active "$1"; then echo -e "$on"; else echo -e "$off"; fi; }
+
+status_any() {
+    for svc in "$@"; do
+        if is_active "$svc"; then echo -e "$on"; return; fi
+    done
+    echo -e "$off"
+}
+
+status_file_and_unit() {
+    local file="$1"; shift
+    if [ -s "$file" ]; then
+        for svc in "$@"; do is_active "$svc" && echo -e "$on" && return; done
+    fi
+    echo -e "$off"
+}
+
+domain=$(cat /etc/xray/domain 2>/dev/null || echo '-')
+IPVPS=$(curl -s ipv4.icanhazip.com 2>/dev/null || hostname -I | awk '{print $1}')
+export IP=$( curl -s https://ipinfo.io/ip/ 2>/dev/null || echo "$IPVPS" )
+
+status_ssh=$(status_any ssh sshd)
+status_udp=$(status_unit udp-custom)
+status_openvpn=$(status_any openvpn-server@server-tcp openvpn-server@server-udp openvpn)
+status_ws_epro=$(status_unit ws)
+status_udp1=$(status_unit udp-mini-1)
+status_udp2=$(status_unit udp-mini-2)
+status_udp3=$(status_unit udp-mini-3)
+status_beruangjatuh=$(status_unit dropbear)
+status_haproxy=$(status_unit haproxy)
+status_cron=$(status_unit cron)
+status_nginx=$(status_unit nginx)
+status_ss=$(status_unit xray)
+status_cftunnel=$(status_any jibsz-cloudflared cloudflared)
+status_jibszbot=$(status_unit jibsz-bot)
+
+if is_enabled_or_active netfilter-persistent; then status_galo="$on"; else status_galo="$off"; fi
+if is_enabled_or_active rc-local || [ -x /etc/rc.local ]; then status_galoo="$on"; else status_galoo="$off"; fi
+if [ -s /etc/cron.d/daily_reboot ] && is_active cron; then status_galooo="$on"; else status_galooo="$off"; fi
+
+status_ohp_ssh="$status_ws_epro"
+status_ohp_dropbear="$status_beruangjatuh"
+status_ohp_openvpn="$status_openvpn"
+
+clear
+echo -e " ${G}┌────────────────────────────────────────────┐${NC}"
+echo -e " ${G}│$NC$NC\033[41m              System Information            $NC${G}│$NC"
+echo -e " ${G}└────────────────────────────────────────────┘${NC}"
+echo -e " ${G}┌────────────────────────────────────────────┐${NC}"
+echo -e " ${G}│$NC Operating System$NC  $B=$NC$yellow $(grep -w PRETTY_NAME /etc/os-release | head -n1 | sed 's/=//g;s/\"//g;s/PRETTY_NAME//g')$NC"
+echo -e " ${G}│$NC IP Server$NC         $B=$NC$yellow $IPVPS$NC"
+echo -e " ${G}│$NC Domain$NC            $B=$NC$yellow $domain$NC"
+echo -e " ${G}└────────────────────────────────────────────┘${NC}"
+echo -e " ${G}┌────────────────────────────────────────────┐${NC}"
+echo -e " ${G}│$NC$NC\033[41m              Service Information           $NC${G}│$NC"
+echo -e " ${G}└────────────────────────────────────────────┘${NC}"
+echo -e " ${G}┌────────────────────────────────────────────┐${NC}"
+echo -e " ${G}│ ${G}Service SSH / TUN                 $B=$NC $status_ssh"
+echo -e " ${G}│ ${G}Service SSH UDP                   $B=$NC $status_udp"
+echo -e " ${G}│ ${G}Service OpenVPN SSL               $B=$NC $status_openvpn"
+echo -e " ${G}│ ${G}Service OpenVPN WS-SSL            $B=$NC $status_openvpn"
+echo -e " ${G}│ ${G}Service OpenVPN UDP               $B=$NC $status_openvpn"
+echo -e " ${G}│ ${G}Service OpenVPN TCP               $B=$NC $status_openvpn"
+echo -e " ${G}│ ${G}Service OHP SSH                   $B=$NC $status_ohp_ssh"
+echo -e " ${G}│ ${G}Service OHP Dropbear              $B=$NC $status_ohp_dropbear"
+echo -e " ${G}│ ${G}Service OHP OpenVPN               $B=$NC $status_ohp_openvpn"
+echo -e " ${G}│ ${G}Service WS ePRO                   $B=$NC $status_ws_epro"
+echo -e " ${G}│ ${G}Service BadVPN 7100               $B=$NC $status_udp1"
+echo -e " ${G}│ ${G}Service BadVPN 7200               $B=$NC $status_udp2"
+echo -e " ${G}│ ${G}Service BadVPN 7300               $B=$NC $status_udp3"
+echo -e " ${G}│ ${G}Service Dropbear                  $B=$NC $status_beruangjatuh"
+echo -e " ${G}│ ${G}Service Haproxy                   $B=$NC $status_haproxy"
+echo -e " ${G}│ ${G}Service Crons                     $B=$NC $status_cron"
+echo -e " ${G}│ ${G}Service Nginx Webserver           $B=$NC $status_nginx"
+echo -e " ${G}│ ${G}Service Cloudflare Argo Tunnel    $B=$NC $status_cftunnel"
+echo -e " ${G}│ ${G}Service Jibsz Bot Telegram        $B=$NC $status_jibszbot"
+echo -e " ${G}│ ${G}Service Xray Vmess WS TLS         $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Vmess WS Non TLS     $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Vmess gRPC           $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Vless WS TLS         $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Vless WS Non TLS     $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Vless gRPC           $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Trojan WS            $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Trojan Non WS        $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Trojan gRPC          $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Shadowsocks WS       $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Shadowsocks Non WS   $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Xray Shadowsocks gRPC     $B=$NC $status_ss"
+echo -e " ${G}│ ${G}Service Iptables                  $B=$NC $status_galo"
+echo -e " ${G}│ ${G}Service RClocal                   $B=$NC $status_galoo"
+echo -e " ${G}│ ${G}Service Autoreboot                $B=$NC $status_galooo"
+echo -e " ${G}└────────────────────────────────────────────┘${NC}"
+echo -e " ${G}└────────────────────────────────────────────┘${NC}"
+echo ""
+read -n 1 -s -r -p "Press any key to back on menu"
+menu

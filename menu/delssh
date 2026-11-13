@@ -1,0 +1,42 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+clear
+echo -e "${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo -e "                MEMBER SSH                   "
+echo -e "${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo "USERNAME          EXP DATE          "
+echo -e "${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+while read expired
+do
+AKUN="$(echo $expired | cut -d: -f1)"
+ID="$(echo $expired | grep -v nobody | cut -d: -f3)"
+exp="$(chage -l $AKUN | grep "Account expires" | awk -F": " '{print $2}')"
+status="$(passwd -S $AKUN | awk '{print $2}' )"
+if [[ $ID -ge 1000 ]]; then
+if [[ "$status" = "L" ]]; then
+printf "%-17s %2s %-17s %2s \n" "$AKUN" "$exp     "
+else
+printf "%-17s %2s %-17s %2s \n" "$AKUN" "$exp     "
+rm -f /var/www/html/ssh-${selected_Login}.txt
+fi
+fi
+done < /etc/passwd
+echo -e "${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo -e "                DELETE SSH                   "
+echo -e "${Y}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+echo ""
+read -p "Ketik Usernamenya : " Pengguna
+
+if getent passwd $Pengguna > /dev/null 2>&1; then
+        userdel $Pengguna > /dev/null 2>&1
+        echo -e "User $Pengguna Berhasil Di Hapus Sayang."
+else
+        echo -e "Failure: User $Pengguna Tidak Di Temukan."
+fi

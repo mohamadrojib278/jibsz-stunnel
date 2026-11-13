@@ -1,0 +1,77 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+
+BIWhite='\033[1;97m'  
+red() { echo -e "\\033[31;1m${*}\\033[0m"; }
+clear
+clear
+
+function clean() {
+clear
+#!/bin/bash
+
+clear
+data=(`find /var/log/ -name '*.log'`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+data=(`find /var/log/ -name '*.err'`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+data=(`find /var/log/ -name 'mail.*'`);
+for log in "${data[@]}"
+do
+echo "$log clear"
+echo > $log
+done
+echo > /var/log/syslog
+echo > /var/log/btmp
+echo > /var/log/messages
+echo > /var/log/debug
+bcc=`date`
+echo ""
+echo "Successfully clean log at $bcc"
+sleep 0.5
+clear
+echo ""
+
+    read -n 1 -s -r -p "Press any key to back on menu"
+    menu-backup
+    
+}
+clear
+echo -e "$M┌─────────────────────────────────────────────────┐${NC}"
+echo -e "$M│\e[1;97;101m               Menu Backup Data                  $M│$NC"
+echo -e "$M└─────────────────────────────────────────────────┘${NC}"
+echo -e " $M┌───────────────────────────────────────────────┐${NC}"
+echo -e "     ${G}[${BIWhite}1${G}] ${NC}Backup Data      "
+echo -e "     ${G}[${BIWhite}2${G}] ${NC}Restore Data     "
+echo -e "     ${G}[${BIWhite}3${G}] ${NC}Auto Backup Data      "
+echo -e "     ${G}[${BIWhite}4${G}] ${NC}Cleaner Data      "
+echo -e "     ${G}[${BIWhite}0${G}] Back To Menu     "
+echo -e " "
+echo -e " ${M}└──────────────────────────────────────────────┘${NC}"
+echo ""
+read -p " Select menu : " opt
+echo -e ""
+case $opt in
+1) clear ; backup ;;
+2) clear ; restore ;;
+3) clear ; autobackup ;;
+4) clear ; clean ;;
+0) clear ; menu ;;
+x) exit ;;
+*) echo -e "" ; echo "Press any key to back on menu" ; sleep 1 ; menu ;;
+esac

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-}"
+DB_FILE="/etc/jibsz-stunnel/users_db.json"
+
+case "${ACTION}" in
+    status)
+        echo "xray        : $(systemctl is-active xray 2>/dev/null || echo inactive)"
+        echo "nginx       : $(systemctl is-active nginx 2>/dev/null || echo inactive)"
+        echo "ws-epro     : $(systemctl is-active ws 2>/dev/null || echo inactive)"
+        echo "cloudflared : $(systemctl is-active jibsz-cloudflared 2>/dev/null || echo inactive)"
+        ;;
+    restart)
+        systemctl restart xray nginx ws jibsz-cloudflared 2>/dev/null || true
+        ;;
+    create-user)
+        USER="${2:-}"
+        PROTO="${3:-all}"
+        UUID="${4:-}"
+        DAYS="${5:-30}"
+        OWNER="${6:-0}"
+        if [[ ! "$USER" =~ ^[a-zA-Z0-9_]{3,20}$ ]]; then
+            echo "Username tidak valid" >&2
+            exit 1
+        fi
+        EXP=$(date -d "${DAYS} days" +"%Y-%m-%d")
+        if grep -qw "$USER" /etc/xray/config.json 2>/dev/null; then
+            echo "Username sudah ada di Xray" >&2
+            exit 1
+        fi
+        if [[ "$PROTO" == "all" || "$PROTO" == "vless" ]]; then
+            sed -i '/#vless$/a\#& '"$USER $EXP"'\n},{"id": "'"$UUID"'","email": "'"$USER"'"' /etc/xray/config.json
+            sed -i '/#vlessgrpc$/a\#& '"$USER $EXP"'\n},{"id": "'"$UUID"'","email": "'"$USER"'"' /etc/xray/config.json
+            echo "### ${USER} ${EXP} ${UUID} 0 0" >> /etc/vless/.vless.db
+        fi
+        if [[ "$PROTO" == "all" || "$PROTO" == "vmess" ]]; then
+            sed -i '/#vmess$/a\### '"$USER $EXP"'\n},{"id": "'"$UUID"'","alterId": 0,"email": "'"$USER"'"' /etc/xray/config.json
+            sed -i '/#vmessgrpc$/a\### '"$USER $EXP"'\n},{"id": "'"$UUID"'","alterId": 0,"email": "'"$USER"'"' /etc/xray/config.json
+            echo "### ${USER} ${EXP} ${UUID} 0 0" >> /etc/vmess/.vmess.db
+        fi
+        if [[ "$PROTO" == "all" || "$PROTO" == "trojan" ]]; then
+            sed -i '/#trojanws$/a\#! '"$USER $EXP"'\n},{"password": "'"$UUID"'","email": "'"$USER"'"' /etc/xray/config.json
+            sed -i '/#trojangrpc$/a\#! '"$USER $EXP"'\n},{"password": "'"$UUID"'","email": "'"$UUID"'"' /etc/xray/config.json
+            echo "### ${USER} ${EXP} ${UUID} 0 0" >> /etc/trojan/.trojan.db
+        fi
+        if [[ "$PROTO" == "all" || "$PROTO" == "ssh" ]]; then
+            PASS="${UUID:0:10}"
+            useradd -e "$EXP" -s /bin/false -M "$USER" 2>/dev/null || true
+            echo -e "${PASS}\n${PASS}\n" | passwd "$USER" >/dev/null 2>&1 || true
+            echo "#ssh# ${USER} ${PASS} 0 0 ${EXP}" >> /etc/ssh/.ssh.db
+        fi
+        if [[ ! -f "$DB_FILE" ]]; then
+            echo '{"users":[]}' > "$DB_FILE"
+        fi
+        tmp_json=$(mktemp)
+        jq --arg u "$USER" --arg id "$UUID" --arg p "$PROTO" --arg e "$EXP" --arg o "$OWNER"            '.users += [{"username":$u,"uuid":$id,"protocol":$p,"expires_at":$e,"owner_id":($o|tonumber)}]'            "$DB_FILE" > "$tmp_json" && mv "$tmp_json" "$DB_FILE"
+        chown jibszbot:jibszbot "$DB_FILE" 2>/dev/null || true
+        systemctl restart xray >/dev/null 2>&1 || true
+        ;;
+    delete-user)
+        USER="${2:-}"
+        if [[ ! "$USER" =~ ^[a-zA-Z0-9_]{3,20}$ ]]; then
+            exit 1
+        fi
+        sed -i "/^#& ${USER} /,+1d" /etc/xray/config.json 2>/dev/null || true
+        sed -i "/^### ${USER} /,+1d" /etc/xray/config.json 2>/dev/null || true
+        sed -i "/^#! ${USER} /,+1d" /etc/xray/config.json 2>/dev/null || true
+        userdel -f "$USER" 2>/dev/null || true
+        if [[ -f "$DB_FILE" ]]; then
+            tmp_json=$(mktemp)
+            jq --arg u "$USER" '.users |= map(select(.username != $u))' "$DB_FILE" > "$tmp_json" && mv "$tmp_json" "$DB_FILE"
+            chown jibszbot:jibszbot "$DB_FILE" 2>/dev/null || true
+        fi
+        systemctl restart xray >/dev/null 2>&1 || true
+        ;;
+esac

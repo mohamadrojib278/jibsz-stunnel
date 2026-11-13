@@ -1,0 +1,122 @@
+#!/bin/bash
+
+SRC_VER_NGINX="1.26.3"
+SRC_VER_HAPROXY="2.8.16"
+SRC_VER_OPENVPN="2.6.20"
+SRC_VER_DROPBEAR="2019.78"
+SRC_DIR="/usr/local/src"
+SRC_LOG="/root/srcbuild.log"
+
+sb_log() { echo "$*" >>"$SRC_LOG"; }
+
+sb_get() {
+    mkdir -p "$SRC_DIR"
+    wget -q -O "$2" "$1" 2>/dev/null || curl -fsSL "$1" -o "$2" 2>/dev/null
+}
+
+sb_deps() {
+    for p in "$@"; do
+        apt-get install "${APT_ARGS[@]}" "$p" >/dev/null 2>&1 || true
+    done
+}
+
+sb_backup() {
+    [ -x "$1" ] && [ ! -f "$1.repo" ] && cp -f "$1" "$1.repo"
+    return 0
+}
+
+sb_nginx() {
+    command -v nginx >/dev/null 2>&1 || return 0
+    nginx -v 2>&1 | grep -q "nginx/${SRC_VER_NGINX}" && return 0
+    sb_deps libpcre2-dev libssl-dev zlib1g-dev
+    sb_get "https://nginx.org/download/nginx-$SRC_VER_NGINX.tar.gz" "$SRC_DIR/nginx.tar.gz" || return 1
+    tar zxf "$SRC_DIR/nginx.tar.gz" -C "$SRC_DIR" >/dev/null 2>&1 || return 1
+    cd "$SRC_DIR/nginx-$SRC_VER_NGINX" || return 1
+    ./configure --prefix=/usr/share/nginx --sbin-path=/usr/sbin/nginx \
+        --conf-path=/etc/nginx/nginx.conf --pid-path=/run/nginx.pid \
+        --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log \
+        --http-client-body-temp-path=/var/lib/nginx/body \
+        --http-proxy-temp-path=/var/lib/nginx/proxy \
+        --http-fastcgi-temp-path=/var/lib/nginx/fastcgi \
+        --http-uwsgi-temp-path=/var/lib/nginx/uwsgi \
+        --http-scgi-temp-path=/var/lib/nginx/scgi \
+        --with-http_ssl_module --with-http_v2_module --with-http_realip_module \
+        --with-http_stub_status_module --with-http_sub_module \
+        --with-stream --with-stream_ssl_module --with-stream_ssl_preread_module \
+        --with-threads >>"$SRC_LOG" 2>&1 || return 1
+    make -j"$(nproc)" >>"$SRC_LOG" 2>&1 || return 1
+    sb_backup /usr/sbin/nginx
+    cp -f objs/nginx /usr/sbin/nginx || return 1
+    cd / || true
+    return 0
+}
+
+sb_haproxy() {
+    command -v haproxy >/dev/null 2>&1 || return 0
+    haproxy -v 2>&1 | head -n1 | grep -q "${SRC_VER_HAPROXY}" && return 0
+    sb_deps libpcre2-dev libssl-dev zlib1g-dev libsystemd-dev
+    sb_get "https://www.haproxy.org/download/2.8/src/haproxy-$SRC_VER_HAPROXY.tar.gz" "$SRC_DIR/haproxy.tar.gz" || return 1
+    tar zxf "$SRC_DIR/haproxy.tar.gz" -C "$SRC_DIR" >/dev/null 2>&1 || return 1
+    cd "$SRC_DIR/haproxy-$SRC_VER_HAPROXY" || return 1
+    make -j"$(nproc)" TARGET=linux-glibc USE_OPENSSL=1 USE_PCRE2=1 USE_ZLIB=1 USE_SYSTEMD=1 >>"$SRC_LOG" 2>&1 \
+        || make -j"$(nproc)" TARGET=linux-glibc USE_OPENSSL=1 USE_PCRE=1 USE_ZLIB=1 >>"$SRC_LOG" 2>&1 \
+        || return 1
+    sb_backup /usr/sbin/haproxy
+    cp -f haproxy /usr/sbin/haproxy || return 1
+    cat >/etc/systemd/system/haproxy.service <<'EOF'
+[Unit]
+Description=HAProxy Load Balancer
+After=network.target
+
+[Service]
+ExecStartPre=/usr/sbin/haproxy -f /etc/haproxy/haproxy.cfg -c -q
+ExecStart=/usr/sbin/haproxy -Ws -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    cd / || true
+    return 0
+}
+
+sb_openvpn() {
+    command -v openvpn >/dev/null 2>&1 || return 0
+    openvpn --version 2>&1 | head -n1 | grep -q "2\.6\." && return 0
+    sb_deps libssl-dev liblzo2-dev liblz4-dev libpam0g-dev libcap-ng-dev iproute2
+    sb_get "https://swupdate.openvpn.net/community/releases/openvpn-$SRC_VER_OPENVPN.tar.gz" "$SRC_DIR/openvpn.tar.gz" || return 1
+    tar zxf "$SRC_DIR/openvpn.tar.gz" -C "$SRC_DIR" >/dev/null 2>&1 || return 1
+    cd "$SRC_DIR/openvpn-$SRC_VER_OPENVPN" || return 1
+    ./configure --prefix=/usr --sysconfdir=/etc --enable-iproute2 >>"$SRC_LOG" 2>&1 || return 1
+    make -j"$(nproc)" >>"$SRC_LOG" 2>&1 || return 1
+    sb_backup /usr/sbin/openvpn
+    cp -f src/openvpn/openvpn /usr/sbin/openvpn || return 1
+    cd / || true
+    return 0
+}
+
+sb_dropbear() {
+    command -v dropbear >/dev/null 2>&1 || return 0
+    dropbear -V 2>&1 | head -n1 | grep -q "$SRC_VER_DROPBEAR" && return 0
+    sb_deps zlib1g-dev libcrypt-dev bzip2
+    sb_get "https://matt.ucc.asn.au/dropbear/releases/dropbear-$SRC_VER_DROPBEAR.tar.bz2" "$SRC_DIR/dropbear.tar.bz2" || return 1
+    tar xjf "$SRC_DIR/dropbear.tar.bz2" -C "$SRC_DIR" >/dev/null 2>&1 || return 1
+    cd "$SRC_DIR/dropbear-$SRC_VER_DROPBEAR" || return 1
+    ./configure --prefix=/usr --sysconfdir=/etc CFLAGS="-O2 -fcommon" >>"$SRC_LOG" 2>&1 || return 1
+    make -j"$(nproc)" >>"$SRC_LOG" 2>&1 || return 1
+    sb_backup /usr/sbin/dropbear
+    make install >>"$SRC_LOG" 2>&1 || return 1
+    cd / || true
+    return 0
+}
+
+sb_report() {
+    {
+        echo "== nginx   : $(nginx -v 2>&1)"
+        echo "== haproxy : $(haproxy -v 2>&1 | head -n1)"
+        echo "== openvpn : $(openvpn --version 2>&1 | head -n1)"
+        echo "== dropbear: $(dropbear -V 2>&1 | head -n1)"
+    } >/root/.versions 2>/dev/null
+}

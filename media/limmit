@@ -1,0 +1,95 @@
+#!/bin/bash
+VIP_DIR="${VIP_DIR:-/root/vip}"
+if [ ! -d "$VIP_DIR" ]; then
+    VIP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
+fi
+REPO="https://raw.githubusercontent.com/mohamadrojib278/jibsz-stunnel/main/"
+
+fetch_media() {
+    local name="$1"
+    local dst="$2"
+    mkdir -p "$(dirname "$dst")"
+    if [ -f "${VIP_DIR}/media/${name}" ]; then
+        cp -f "${VIP_DIR}/media/${name}" "$dst"
+    elif [ -f "$(pwd)/${name}" ]; then
+        cp -f "$(pwd)/${name}" "$dst"
+    else
+        wget -q -O "$dst" "${REPO}media/${name}" || curl -fsSL "${REPO}media/${name}" -o "$dst"
+    fi
+}
+
+fetch_media "limitvmess.service" "/etc/systemd/system/limitvmess.service" && chmod +x /etc/systemd/system/limitvmess.service >/dev/null 2>&1
+fetch_media "limitvless.service" "/etc/systemd/system/limitvless.service" && chmod +x /etc/systemd/system/limitvless.service >/dev/null 2>&1
+fetch_media "limittrojan.service" "/etc/systemd/system/limittrojan.service" && chmod +x /etc/systemd/system/limittrojan.service >/dev/null 2>&1
+fetch_media "limitshadowsocks.service" "/etc/systemd/system/limitshadowsocks.service" && chmod +x /etc/systemd/system/limitshadowsocks.service >/dev/null 2>&1
+fetch_media "vmess" "/etc/xray/limit.vmess" >/dev/null 2>&1
+fetch_media "vless" "/etc/xray/limit.vless" >/dev/null 2>&1
+fetch_media "trojan" "/etc/xray/limit.trojan" >/dev/null 2>&1
+fetch_media "shadowsocks" "/etc/xray/limit.shadowsocks" >/dev/null 2>&1
+chmod +x /etc/xray/limit.vmess
+chmod +x /etc/xray/limit.vless
+chmod +x /etc/xray/limit.trojan
+chmod +x /etc/xray/limit.shadowsocks
+systemctl daemon-reload
+systemctl enable --now limitvmess
+systemctl enable --now limitvless
+systemctl enable --now limittrojan
+systemctl enable --now limitshadowsocks
+
+cd
+fetch_media "limit-ip" "/usr/bin/limit-ip"
+chmod +x /usr/bin/*
+cd /usr/bin
+sed -i 's/\r//' limit-ip
+cd
+clear
+cat >/etc/systemd/system/vmip.service << EOF
+[Unit]
+Description=My
+ProjectAfter=network.target
+
+[Service]
+WorkingDirectory=/root
+ExecStart=/usr/bin/limit-ip vmip
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat >/etc/systemd/system/vlip.service << EOF
+[Unit]
+Description=My
+ProjectAfter=network.target
+
+[Service]
+WorkingDirectory=/root
+ExecStart=/usr/bin/limit-ip vlip
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat >/etc/systemd/system/trip.service << EOF
+[Unit]
+Description=My
+ProjectAfter=network.target
+
+[Service]
+WorkingDirectory=/root
+ExecStart=/usr/bin/limit-ip trip
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl restart vmip
+systemctl enable vmip
+systemctl restart vlip
+systemctl enable vlip
+systemctl restart trip
+systemctl enable trip
+
+rm -rf /root/limmit

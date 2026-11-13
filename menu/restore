@@ -1,0 +1,45 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+clear
+function notif_restore() {
+    green "Notif AddHost Tele"
+    sleep 2
+URL="$URL"
+TEXT="
+<code>◇━━━━━━━━━━━━━━◇</code>
+<b>  ⚠️ RESTORE NOTIF⚠️</b>
+<b>     Detail Restore VPS</b>
+<code>◇━━━━━━━━━━━━━━◇</code>
+<code>Restore Vps Done</code>
+<code>◇━━━━━━━━━━━━━━◇</code>
+"
+}
+clear
+echo "Silahkan Masukin Link Backupnya"
+read -rp "Link File: " -e url
+wget -O backup.zip "$url"
+unzip backup.zip
+rm -f backup.zip
+sleep 1
+echo Start Restore
+cd /root/backup
+cp passwd /etc/
+cp group /etc/
+cp shadow /etc/
+cp gshadow /etc/
+cp -r kyt /var/lib/
+cp -r xray /etc/
+cp -r html /var/www/
+cp crontab /etc/
+
+notif_restore
+rm -rf /root/backup
+rm -f backup.zip
+echo ""

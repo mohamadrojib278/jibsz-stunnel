@@ -1,0 +1,28 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+clear
+echo " "
+echo -e "\033[1;93m┌──────────────────────────────────────────┐\033[0m"
+echo " ";
+if [ -e "/root/log-limit.txt" ]; then
+echo "User Who Violate The Maximum Limit";
+echo "Time - Username - Number of Multilogin"
+echo -e "\033[1;93m└──────────────────────────────────────────┘\033[0m"
+cat /root/log-limit.txt
+else
+echo " No user has committed a violation"
+echo " "
+echo " or"
+echo " "
+echo " The user-limit script not been executed."
+fi
+echo " ";
+echo -e "\033[1;93m└──────────────────────────────────────────┘\033[0m"
+echo " ";

@@ -1,0 +1,41 @@
+#!/bin/bash
+R="\e[1;31m"
+G="\e[92;1m"
+Y="\e[33m"
+B="\e[34m"
+C="\e[36m"
+M="\e[35m"
+W="\e[37;1m"
+NC="\e[0m"
+
+BIWhite='\033[1;97m'  
+red() { echo -e "\\033[31;1m${*}\\033[0m"; }
+clear
+clear
+
+clear
+echo -e "$M┌─────────────────────────────────────────────────┐${NC}"
+echo -e "$M│\e[1;97;101m                    TROJAN MENU                  $M│$NC"
+echo -e "$M└─────────────────────────────────────────────────┘${NC}"
+echo -e " $M┌───────────────────────────────────────────────┐${NC}"
+echo -e "     ${G}[${BIWhite}1${G}] ${NC}Create Trojan Account      "
+echo -e "     ${G}[${BIWhite}2${G}] ${NC}Trial Account Trojan     "
+echo -e "     ${G}[${BIWhite}3${G}] ${NC}Delete Account Trojan      "
+echo -e "     ${G}[${BIWhite}4${G}] ${NC}Renew Account Trojan      "
+echo -e "     ${G}[${BIWhite}5${G}] ${NC}Cek User Login Account Trojan      "
+echo -e "     ${G}[${BIWhite}0${G}] Back To Menu     "
+echo -e " "
+echo -e " ${M}└──────────────────────────────────────────────┘${NC}"
+echo ""
+read -p " Select menu : " opt
+echo -e ""
+case $opt in
+1) clear ; addtr ;;
+2) clear ; trialtr ;;
+3) clear ; deltr ;;
+4) clear ; renewtr ;;
+5) clear ; cektr ;;
+0) clear ; menu ;;
+x) exit ;;
+*) echo -e "" ; echo "Press any key to back on menu" ; sleep 1 ; menu ;;
+esac
